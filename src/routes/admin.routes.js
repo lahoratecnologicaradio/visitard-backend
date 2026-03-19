@@ -78,4 +78,17 @@ router.patch('/agencies/:userId', async (req, res, next) => {
   } catch (err) { next(err) }
 })
 
+// GET /api/admin/agencies
+router.get('/agencies', async (_req, res, next) => {
+  try {
+    const [agencies] = await db.query(
+      `SELECT a.*, u.email AS user_email, u.name AS user_name, u.phone
+       FROM agencies a
+       JOIN users u ON a.user_id = u.id
+       ORDER BY a.created_at DESC`
+    )
+    res.json({ success: true, data: agencies })
+  } catch (err) { next(err) }
+})
+
 module.exports = router;
