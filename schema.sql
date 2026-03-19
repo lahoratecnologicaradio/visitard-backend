@@ -8,6 +8,7 @@ USE visitard;
 
 -- ── USUARIOS ─────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS users (
+
   id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   name         VARCHAR(120)     NOT NULL,
   email        VARCHAR(180)     NOT NULL UNIQUE,

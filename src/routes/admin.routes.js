@@ -62,4 +62,20 @@ router.delete('/trips/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// PATCH /api/admin/agencies/:userId
+router.patch('/agencies/:userId', async (req, res, next) => {
+  try {
+    const { description, commission_rate, ruc } = req.body
+    await db.query(
+      `UPDATE agencies SET
+         description     = COALESCE(?, description),
+         commission_rate = COALESCE(?, commission_rate),
+         ruc             = COALESCE(?, ruc)
+       WHERE user_id = ?`,
+      [description, commission_rate, ruc, req.params.userId]
+    )
+    res.json({ success: true })
+  } catch (err) { next(err) }
+})
+
 module.exports = router;
