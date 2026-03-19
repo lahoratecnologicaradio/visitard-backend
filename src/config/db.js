@@ -24,9 +24,9 @@ pool.getConnection()
     console.log('[MySQL] Conectado correctamente');
     conn.release();
   })
-  .catch((err) => {
-    console.error('[MySQL] Error de conexión:', err.message);
-    process.exit(1); // Si no hay DB, no arrancar el server
+ .catch((err) => {
+    console.error('[MySQL] Advertencia:', err.message);
+    console.error('[MySQL] Verifica las variables DB_* en Railway');
   });
 
 module.exports = pool;
