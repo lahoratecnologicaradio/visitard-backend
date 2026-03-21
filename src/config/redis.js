@@ -3,7 +3,7 @@
 // Cache para tracking GPS, lugares populares y sesiones
 // ============================================================
 
-const { createClient } = require('redis');
+/*const { createClient } = require('redis');
 
 const client = createClient({
   url: process.env.REDIS_URL || 'redis://localhost:6379',
@@ -19,4 +19,14 @@ client.connect().catch((err) => {
   // Redis no es crítico — el servidor sigue funcionando sin cache
 });
 
-module.exports = client;
+module.exports = client;*/
+
+const client = {
+  get: async () => null,
+  set: async () => null,
+  del: async () => null,
+  on: () => {},
+  connect: async () => {},
+}
+console.log('[Redis] Modo sin caché')
+module.exports = client
