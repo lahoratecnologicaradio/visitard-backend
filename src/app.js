@@ -86,6 +86,7 @@ app.use('/api/ai',       aiRoutes);
 app.use('/api/reviews',  reviewRoutes);
 app.use('/api/admin',    adminRoutes);
 app.use('/api/media', require('./routes/media.routes'));
+app.use('/api/videos', require('./routes/videos.routes'));
 
 // ════════════════════════════════════════════════════════════
 // WEBHOOK DE STRIPE — debe ir ANTES del express.json()
