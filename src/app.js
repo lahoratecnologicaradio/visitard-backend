@@ -92,6 +92,7 @@ app.use('/api/guides',       require('./routes/guides.routes'));
 app.use('/api/accommodations', require('./routes/accommodations.routes'));
 app.use('/api/food',         require('./routes/food_vendors.routes'));
 app.use('/api/requests',     require('./routes/service_requests.routes'));
+app.use('/api/transport', require('./routes/transport.routes'));
 
 // ════════════════════════════════════════════════════════════
 // WEBHOOK DE STRIPE — debe ir ANTES del express.json()
