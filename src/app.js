@@ -87,6 +87,11 @@ app.use('/api/reviews',  reviewRoutes);
 app.use('/api/admin',    adminRoutes);
 app.use('/api/media', require('./routes/media.routes'));
 app.use('/api/videos', require('./routes/videos.routes'));
+app.use('/api/buses',        require('./routes/buses.routes'));
+app.use('/api/guides',       require('./routes/guides.routes'));
+app.use('/api/accommodations', require('./routes/accommodations.routes'));
+app.use('/api/food',         require('./routes/food_vendors.routes'));
+app.use('/api/requests',     require('./routes/service_requests.routes'));
 
 // ════════════════════════════════════════════════════════════
 // WEBHOOK DE STRIPE — debe ir ANTES del express.json()
