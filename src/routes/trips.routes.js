@@ -66,14 +66,20 @@ router.get('/', async (req, res, next) => {
 
     // Para cada viaje activo, adjuntar última ubicación GPS de Redis
     const tripsWithLocation = await Promise.all(
-      trips.map(async (trip) => {
-        const loc = await redis.get(`trip:tracking:${trip.id}`);
-        return {
-          ...trip,
-          current_location: loc ? JSON.parse(loc) : null,
-        };
-      })
-    );
+    trips.map(async (trip) => {
+      let current_location = null;
+      try {
+        const loc = await Promise.race([
+          redis.get(`trip:tracking:${trip.id}`),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 500))
+        ]);
+        current_location = loc ? JSON.parse(loc) : null;
+      } catch {
+        current_location = null;
+      }
+      return { ...trip, current_location };
+    })
+  );
 
     res.json({ success: true, data: tripsWithLocation, page: parseInt(page) });
   } catch (err) {
