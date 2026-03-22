@@ -82,4 +82,18 @@ router.patch('/:id', authenticate, authorize('bus_owner', 'admin'), async (req, 
   } catch (err) { next(err) }
 })
 
+// GET /api/buses/my — mis buses (autenticado)
+router.get('/my', authenticate, async (req, res, next) => {
+  try {
+    const [buses] = await db.query(
+      `SELECT b.*, u.name AS owner_name, u.phone AS owner_phone
+       FROM buses b JOIN users u ON b.owner_id = u.id
+       WHERE b.owner_id = ?
+       ORDER BY b.created_at DESC`,
+      [req.user.id]
+    )
+    res.json({ success: true, data: buses })
+  } catch (err) { next(err) }
+})
+
 module.exports = router
