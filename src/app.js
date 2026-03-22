@@ -95,6 +95,7 @@ app.use('/api/requests',     require('./routes/service_requests.routes'));
 app.use('/api/transport', require('./routes/transport.routes'));
 app.use('/api/rentals', require('./routes/rentals.routes'));
 app.use('/api/notifications', require('./routes/notifications.routes'));
+app.use('/api/analytics', require('./routes/analytics.routes'));
 
 // ════════════════════════════════════════════════════════════
 // WEBHOOK DE STRIPE — debe ir ANTES del express.json()
