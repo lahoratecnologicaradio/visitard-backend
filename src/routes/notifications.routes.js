@@ -127,4 +127,4 @@ router.patch('/:id/read', authenticate, async (req, res, next) => {
 })
 
 module.exports = router
-EOF
+
