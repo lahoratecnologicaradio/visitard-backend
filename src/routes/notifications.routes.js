@@ -83,7 +83,7 @@ router.post('/send-to-user', authenticate, async (req, res, next) => {
       return res.json({ success: false, message: 'Usuario sin token push' })
     }
 
-    const messages = tokens.map((t: { token: string }) => ({
+    const messages = tokens.map((t) => ({
       to:    t.token,
       sound: 'default',
       title,
