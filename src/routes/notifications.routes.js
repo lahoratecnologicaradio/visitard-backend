@@ -48,8 +48,8 @@ router.post('/send-to-nearby-buses', authenticate, async (req, res, next) => {
     }
 
     // Enviar via Expo Push API
-    const tokens  = buses.map((b: { token: string }) => b.token)
-    const messages = tokens.map((token: string) => ({
+    const tokens  = buses.map((b) => b.token)
+    const messages = tokens.map((token) => ({
       to:    token,
       sound: 'default',
       title,
