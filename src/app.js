@@ -18,6 +18,7 @@ const placeRoutes    = require('./routes/places.routes');
 const aiRoutes       = require('./routes/ai.routes');
 const adminRoutes    = require('./routes/admin.routes');
 const reviewRoutes   = require('./routes/reviews.routes');
+const beachesRoutes  = require('./routes/beaches.routes'); // ✨ NUEVA RUTA PLAYAS
 
 const app = express();
 
@@ -96,6 +97,7 @@ app.use('/api/transport', require('./routes/transport.routes'));
 app.use('/api/rentals', require('./routes/rentals.routes'));
 app.use('/api/notifications', require('./routes/notifications.routes'));
 app.use('/api/analytics', require('./routes/analytics.routes'));
+app.use('/api/beaches',  beachesRoutes); // ✨ NUEVA RUTA CONGESTIÓN PLAYAS
 
 // ════════════════════════════════════════════════════════════
 // WEBHOOK DE STRIPE — debe ir ANTES del express.json()

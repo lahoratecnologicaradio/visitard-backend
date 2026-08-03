@@ -1,0 +1,192 @@
+// backend/routes/beaches.routes.js
+const express = require('express');
+const db = require('../db'); // Tu conexión MySQL
+
+const router = express.Router();
+
+// ✅ 1️⃣ REGISTRAR CHECK-IN (usuario visita playa)
+router.post('/api/beaches/checkin', async (req, res) => {
+  try {
+    const { user_id, beach_id, stay_duration } = req.body;
+
+    // Validar
+    if (!user_id || !beach_id) {
+      return res.status(400).json({ error: 'user_id y beach_id requeridos' });
+    }
+
+    // Verificar playa existe
+    const beach = await db.query('SELECT id FROM beaches WHERE id = ?', [beach_id]);
+    if (beach.length === 0) {
+      return res.status(404).json({ error: 'Playa no encontrada' });
+    }
+
+    // Insertar check-in
+    await db.query(
+      'INSERT INTO beach_checkins (user_id, beach_id, stay_duration, checkin_time) VALUES (?, ?, ?, NOW())',
+      [user_id, beach_id, stay_duration || null]
+    );
+
+    res.json({ success: true, message: 'Check-in registrado' });
+  } catch (err) {
+    console.error('Error checkin:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ✅ 2️⃣ OBTENER TODAS LAS PLAYAS CON CONGESTIÓN ACTUAL
+router.get('/api/beaches', async (req, res) => {
+  try {
+    const beaches = await db.query(`
+      SELECT 
+        b.id,
+        b.name,
+        b.type,
+        b.lat,
+        b.lng,
+        b.capacity,
+        b.description,
+        COALESCE(bp.predicted_congestion, 0) as current_congestion,
+        COALESCE(bp.level, 'green') as level,
+        COALESCE(bp.predicted_users, 0) as predicted_users
+      FROM beaches b
+      LEFT JOIN beach_predictions bp ON b.id = bp.beach_id 
+        AND bp.prediction_hour = (
+          SELECT MAX(prediction_hour) FROM beach_predictions 
+          WHERE beach_id = b.id AND prediction_hour <= NOW()
+        )
+      ORDER BY b.name
+    `);
+
+    res.json(beaches);
+  } catch (err) {
+    console.error('Error beaches:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ✅ 3️⃣ OBTENER DETALLES DE UNA PLAYA (próximas 24h)
+router.get('/api/beaches/:beach_id', async (req, res) => {
+  try {
+    const { beach_id } = req.params;
+
+    // Info de la playa
+    const beach = await db.query(
+      'SELECT * FROM beaches WHERE id = ?',
+      [beach_id]
+    );
+
+    if (beach.length === 0) {
+      return res.status(404).json({ error: 'Playa no encontrada' });
+    }
+
+    // Predicciones próximas 24h
+    const predictions = await db.query(`
+      SELECT 
+        prediction_hour,
+        predicted_congestion,
+        predicted_users,
+        level
+      FROM beach_predictions
+      WHERE beach_id = ?
+        AND prediction_hour >= NOW()
+        AND prediction_hour <= DATE_ADD(NOW(), INTERVAL 24 HOUR)
+      ORDER BY prediction_hour ASC
+    `, [beach_id]);
+
+    // Mejor hora para visitar
+    const bestTime = await db.query(`
+      SELECT 
+        prediction_hour,
+        predicted_congestion,
+        predicted_users
+      FROM beach_predictions
+      WHERE beach_id = ?
+        AND prediction_hour >= NOW()
+        AND prediction_hour <= DATE_ADD(NOW(), INTERVAL 24 HOUR)
+      ORDER BY predicted_congestion ASC
+      LIMIT 1
+    `, [beach_id]);
+
+    res.json({
+      beach: beach[0],
+      current: predictions[0] || {},
+      hourly_forecast: predictions,
+      best_time: bestTime[0] || null,
+      recommendation: generateRecommendation(predictions[0])
+    });
+  } catch (err) {
+    console.error('Error beach details:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ✅ 4️⃣ BÚSQUEDA: "Playas menos concurridas AHORA"
+router.get('/api/beaches/search/least-crowded', async (req, res) => {
+  try {
+    const beaches = await db.query(`
+      SELECT 
+        b.id,
+        b.name,
+        b.type,
+        b.lat,
+        b.lng,
+        COALESCE(bp.predicted_congestion, 0) as congestion,
+        COALESCE(bp.level, 'green') as level
+      FROM beaches b
+      LEFT JOIN beach_predictions bp ON b.id = bp.beach_id 
+        AND bp.prediction_hour = (
+          SELECT MAX(prediction_hour) FROM beach_predictions 
+          WHERE beach_id = b.id AND prediction_hour <= NOW()
+        )
+      ORDER BY congestion ASC
+      LIMIT 5
+    `);
+
+    res.json(beaches);
+  } catch (err) {
+    console.error('Error least crowded:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ✅ 5️⃣ ESTADÍSTICAS DE VISITANTES (últimos 30 días)
+router.get('/api/beaches/:beach_id/stats', async (req, res) => {
+  try {
+    const { beach_id } = req.params;
+
+    const stats = await db.query(`
+      SELECT 
+        HOUR(checkin_time) as hour,
+        COUNT(*) as visitor_count,
+        AVG(stay_duration) as avg_stay_minutes
+      FROM beach_checkins
+      WHERE beach_id = ?
+        AND checkin_time >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+      GROUP BY HOUR(checkin_time)
+      ORDER BY hour ASC
+    `, [beach_id]);
+
+    res.json(stats);
+  } catch (err) {
+    console.error('Error stats:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Helper: Generar recomendación
+function generateRecommendation(prediction) {
+  if (!prediction) return null;
+  
+  switch (prediction.level) {
+    case 'green':
+      return '🟢 Poco concurrido - Excelente momento para visitar';
+    case 'yellow':
+      return '🟡 Moderadamente lleno - Espera 2-3 horas para menos gente';
+    case 'red':
+      return '🔴 Muy concurrido - Recomendamos otro momento';
+    default:
+      return null;
+  }
+}
+
+module.exports = router;
