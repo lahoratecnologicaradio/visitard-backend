@@ -1,6 +1,6 @@
 // backend/routes/beaches.routes.js
 const express = require('express');
-const db = require('../db'); // Tu conexión MySQL
+const db = require('../config/db'); 
 
 const router = express.Router();
 
