@@ -6,6 +6,10 @@
 const express = require('express');
 const db = require('../config/db'); // ✨ RUTA CORRECTA
 
+const multer = require('multer');
+const upload = multer({ dest: 'uploads/beaches/' });
+const cloudinary = require('cloudinary').v2;
+
 const router = express.Router();
 
 // ✅ 1️⃣ REGISTRAR CHECK-IN (usuario visita playa)
@@ -222,5 +226,59 @@ function generateRecommendation(prediction) {
       return null;
   }
 }
+
+
+
+router.post('/:beach_id/photos', upload.single('photo'), async (req, res, next) => {
+  try {
+    const { beach_id } = req.params;
+    const photoUrl = `/uploads/beaches/${req.file.filename}`;
+
+    // Obtener fotos actuales
+    const [beach] = await db.query('SELECT photos FROM beaches WHERE id = ?', [beach_id]);
+    let photos = beach[0]?.photos ? JSON.parse(beach[0].photos) : [];
+
+    // Agregar nueva foto
+    photos.push(photoUrl);
+
+    // Guardar
+    await db.query('UPDATE beaches SET photos = ? WHERE id = ?', [
+      JSON.stringify(photos),
+      beach_id,
+    ]);
+
+    res.json({ success: true, photos });
+  } catch (err) {
+    next(err);
+  }
+});
+
+
+
+router.post('/:beach_id/photos/upload', async (req, res, next) => {
+  try {
+    const { beach_id } = req.params;
+    const { image_base64 } = req.body;
+
+    // Subir a Cloudinary
+    const result = await cloudinary.uploader.upload(`data:image/jpeg;base64,${image_base64}`, {
+      folder: `beaches/${beach_id}`,
+    });
+
+    // Guardar URL en BD
+    const [beach] = await db.query('SELECT photos FROM beaches WHERE id = ?', [beach_id]);
+    let photos = beach[0]?.photos ? JSON.parse(beach[0].photos) : [];
+    photos.push(result.secure_url);
+
+    await db.query('UPDATE beaches SET photos = ? WHERE id = ?', [
+      JSON.stringify(photos),
+      beach_id,
+    ]);
+
+    res.json({ success: true, url: result.secure_url });
+  } catch (err) {
+    next(err);
+  }
+});
 
 module.exports = router;
