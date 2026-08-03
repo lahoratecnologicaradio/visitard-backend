@@ -1,23 +1,34 @@
-// backend/routes/beaches.routes.js
+// ============================================================
+// beaches.routes.js — VisitaRD · Rutas de Congestión de Playas
+// Endpoints para check-ins, predicciones y análisis de congestión
+// ============================================================
+
 const express = require('express');
-const db = require('../config/db'); 
+const db = require('../config/db'); // ✨ RUTA CORRECTA
 
 const router = express.Router();
 
 // ✅ 1️⃣ REGISTRAR CHECK-IN (usuario visita playa)
-router.post('/api/beaches/checkin', async (req, res) => {
+// POST /api/beaches/checkin
+router.post('/checkin', async (req, res, next) => {
   try {
     const { user_id, beach_id, stay_duration } = req.body;
 
     // Validar
     if (!user_id || !beach_id) {
-      return res.status(400).json({ error: 'user_id y beach_id requeridos' });
+      return res.status(400).json({ 
+        success: false,
+        error: 'user_id y beach_id son requeridos' 
+      });
     }
 
     // Verificar playa existe
-    const beach = await db.query('SELECT id FROM beaches WHERE id = ?', [beach_id]);
+    const [beach] = await db.query('SELECT id FROM beaches WHERE id = ?', [beach_id]);
     if (beach.length === 0) {
-      return res.status(404).json({ error: 'Playa no encontrada' });
+      return res.status(404).json({ 
+        success: false,
+        error: 'Playa no encontrada' 
+      });
     }
 
     // Insertar check-in
@@ -26,17 +37,20 @@ router.post('/api/beaches/checkin', async (req, res) => {
       [user_id, beach_id, stay_duration || null]
     );
 
-    res.json({ success: true, message: 'Check-in registrado' });
+    res.json({ 
+      success: true, 
+      message: 'Check-in registrado exitosamente' 
+    });
   } catch (err) {
-    console.error('Error checkin:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ✅ 2️⃣ OBTENER TODAS LAS PLAYAS CON CONGESTIÓN ACTUAL
-router.get('/api/beaches', async (req, res) => {
+// GET /api/beaches
+router.get('/', async (req, res, next) => {
   try {
-    const beaches = await db.query(`
+    const [beaches] = await db.query(`
       SELECT 
         b.id,
         b.name,
@@ -57,30 +71,36 @@ router.get('/api/beaches', async (req, res) => {
       ORDER BY b.name
     `);
 
-    res.json(beaches);
+    res.json({ 
+      success: true,
+      data: beaches 
+    });
   } catch (err) {
-    console.error('Error beaches:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ✅ 3️⃣ OBTENER DETALLES DE UNA PLAYA (próximas 24h)
-router.get('/api/beaches/:beach_id', async (req, res) => {
+// GET /api/beaches/:beach_id
+router.get('/:beach_id', async (req, res, next) => {
   try {
     const { beach_id } = req.params;
 
     // Info de la playa
-    const beach = await db.query(
+    const [beach] = await db.query(
       'SELECT * FROM beaches WHERE id = ?',
       [beach_id]
     );
 
     if (beach.length === 0) {
-      return res.status(404).json({ error: 'Playa no encontrada' });
+      return res.status(404).json({ 
+        success: false,
+        error: 'Playa no encontrada' 
+      });
     }
 
     // Predicciones próximas 24h
-    const predictions = await db.query(`
+    const [predictions] = await db.query(`
       SELECT 
         prediction_hour,
         predicted_congestion,
@@ -94,7 +114,7 @@ router.get('/api/beaches/:beach_id', async (req, res) => {
     `, [beach_id]);
 
     // Mejor hora para visitar
-    const bestTime = await db.query(`
+    const [bestTime] = await db.query(`
       SELECT 
         prediction_hour,
         predicted_congestion,
@@ -108,22 +128,25 @@ router.get('/api/beaches/:beach_id', async (req, res) => {
     `, [beach_id]);
 
     res.json({
-      beach: beach[0],
-      current: predictions[0] || {},
-      hourly_forecast: predictions,
-      best_time: bestTime[0] || null,
-      recommendation: generateRecommendation(predictions[0])
+      success: true,
+      data: {
+        beach: beach[0],
+        current: predictions[0] || {},
+        hourly_forecast: predictions,
+        best_time: bestTime[0] || null,
+        recommendation: generateRecommendation(predictions[0])
+      }
     });
   } catch (err) {
-    console.error('Error beach details:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ✅ 4️⃣ BÚSQUEDA: "Playas menos concurridas AHORA"
-router.get('/api/beaches/search/least-crowded', async (req, res) => {
+// GET /api/beaches/search/least-crowded
+router.get('/search/least-crowded', async (req, res, next) => {
   try {
-    const beaches = await db.query(`
+    const [beaches] = await db.query(`
       SELECT 
         b.id,
         b.name,
@@ -142,19 +165,22 @@ router.get('/api/beaches/search/least-crowded', async (req, res) => {
       LIMIT 5
     `);
 
-    res.json(beaches);
+    res.json({ 
+      success: true,
+      data: beaches 
+    });
   } catch (err) {
-    console.error('Error least crowded:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ✅ 5️⃣ ESTADÍSTICAS DE VISITANTES (últimos 30 días)
-router.get('/api/beaches/:beach_id/stats', async (req, res) => {
+// GET /api/beaches/:beach_id/stats
+router.get('/:beach_id/stats', async (req, res, next) => {
   try {
     const { beach_id } = req.params;
 
-    const stats = await db.query(`
+    const [stats] = await db.query(`
       SELECT 
         HOUR(checkin_time) as hour,
         COUNT(*) as visitor_count,
@@ -166,14 +192,22 @@ router.get('/api/beaches/:beach_id/stats', async (req, res) => {
       ORDER BY hour ASC
     `, [beach_id]);
 
-    res.json(stats);
+    res.json({ 
+      success: true,
+      data: stats 
+    });
   } catch (err) {
-    console.error('Error stats:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-// Helper: Generar recomendación
+// ════════════════════════════════════════════════════════════
+// HELPER FUNCTIONS
+// ════════════════════════════════════════════════════════════
+
+/**
+ * Generar recomendación basada en nivel de congestión
+ */
 function generateRecommendation(prediction) {
   if (!prediction) return null;
   
@@ -183,7 +217,7 @@ function generateRecommendation(prediction) {
     case 'yellow':
       return '🟡 Moderadamente lleno - Espera 2-3 horas para menos gente';
     case 'red':
-      return '🔴 Muy concurrido - Recomendamos otro momento';
+      return '🔴 Muy concurrido - Recomendamos otro momento o día';
     default:
       return null;
   }
