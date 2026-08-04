@@ -1,7 +1,7 @@
 const express = require('express')
 const router  = express.Router()
 const { pool } = require('../config/db')
-const { authenticateToken, requireAdmin } = require('../middleware/auth')
+const { authenticate, authorize } = require('../middleware/auth')
 
 // GET /api/slides — público, para el frontend
 router.get('/', async (req, res) => {
@@ -30,7 +30,7 @@ router.get('/active', async (req, res) => {
 })
 
 // POST /api/slides — crear slide (solo admin)
-router.post('/', authenticateToken, requireAdmin, async (req, res) => {
+router.post('/', authenticate, authorize('admin'), async (req, res) => {
   try {
     const { img, title, highlight, sub, tag, sort_order = 0, active = 1 } = req.body
     if (!img) return res.status(400).json({ success: false, message: 'La imagen es requerida' })
@@ -48,7 +48,7 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
 })
 
 // PUT /api/slides/:id — actualizar slide (solo admin)
-router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.put('/:id', authenticate, authorize('admin'), async (req, res) => {
   try {
     const { id } = req.params
     const { img, title, highlight, sub, tag, sort_order, active } = req.body
@@ -75,7 +75,7 @@ router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
 })
 
 // PATCH /api/slides/:id/toggle — activar/desactivar (solo admin)
-router.patch('/:id/toggle', authenticateToken, requireAdmin, async (req, res) => {
+router.patch('/:id/toggle', authenticate, authorize('admin'), async (req, res) => {
   try {
     const { id } = req.params
     await pool.query('UPDATE hero_slides SET active = NOT active WHERE id = ?', [id])
@@ -88,7 +88,7 @@ router.patch('/:id/toggle', authenticateToken, requireAdmin, async (req, res) =>
 })
 
 // DELETE /api/slides/:id — eliminar slide (solo admin)
-router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.delete('/:id', authenticate, authorize('admin'), async (req, res) => {
   try {
     const { id } = req.params
     const [rows] = await pool.query('SELECT id FROM hero_slides WHERE id = ?', [id])
@@ -102,7 +102,7 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
 })
 
 // PUT /api/slides/reorder — reordenar slides (solo admin)
-router.put('/reorder', authenticateToken, requireAdmin, async (req, res) => {
+router.put('/reorder', authenticate, authorize('admin'), async (req, res) => {
   try {
     const { order } = req.body // [{ id: 1, sort_order: 0 }, ...]
     if (!Array.isArray(order)) return res.status(400).json({ success: false, message: 'order debe ser un array' })
