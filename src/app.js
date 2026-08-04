@@ -92,6 +92,7 @@ app.use('/api/analytics',      require('./routes/analytics.routes'));
 app.use('/api/beaches',        beachesRoutes);
 app.use('/api/settings',       require('./routes/settings.routes'));
 app.use('/api/slides',         require('./routes/slides.routes'));
+app.use('/api/ai',             require('./routes/ai.flyer.routes'))
 
 // ════════════════════════════════════════════════════════════
 // WEBHOOK DE STRIPE
