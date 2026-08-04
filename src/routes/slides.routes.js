@@ -1,6 +1,6 @@
 const express = require('express')
 const router  = express.Router()
-const { pool } = require('../config/db')
+const pool = require('../config/db')
 const { authenticate, authorize } = require('../middleware/auth')
 
 // GET /api/slides — público, para el frontend
