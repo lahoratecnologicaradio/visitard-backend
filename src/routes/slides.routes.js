@@ -1,12 +1,12 @@
 const express = require('express')
 const router  = express.Router()
-const db      = require('../db')
+const { pool } = require('../config/db')
 const { authenticateToken, requireAdmin } = require('../middleware/auth')
 
 // GET /api/slides — público, para el frontend
 router.get('/', async (req, res) => {
   try {
-    const [rows] = await db.query(
+    const [rows] = await pool.query(
       'SELECT * FROM hero_slides ORDER BY sort_order ASC, id ASC'
     )
     res.json({ success: true, data: rows })
@@ -19,7 +19,7 @@ router.get('/', async (req, res) => {
 // GET /api/slides/active — solo slides activos (para el hero del frontend)
 router.get('/active', async (req, res) => {
   try {
-    const [rows] = await db.query(
+    const [rows] = await pool.query(
       'SELECT * FROM hero_slides WHERE active = 1 ORDER BY sort_order ASC'
     )
     res.json({ success: true, data: rows })
@@ -35,11 +35,11 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
     const { img, title, highlight, sub, tag, sort_order = 0, active = 1 } = req.body
     if (!img) return res.status(400).json({ success: false, message: 'La imagen es requerida' })
 
-    const [result] = await db.query(
+    const [result] = await pool.query(
       'INSERT INTO hero_slides (img, title, highlight, sub, tag, sort_order, active) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [img, title || '', highlight || '', sub || '', tag || '', sort_order, active ? 1 : 0]
     )
-    const [rows] = await db.query('SELECT * FROM hero_slides WHERE id = ?', [result.insertId])
+    const [rows] = await pool.query('SELECT * FROM hero_slides WHERE id = ?', [result.insertId])
     res.status(201).json({ success: true, data: rows[0] })
   } catch (err) {
     console.error('POST /slides:', err)
@@ -53,7 +53,7 @@ router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
     const { id } = req.params
     const { img, title, highlight, sub, tag, sort_order, active } = req.body
 
-    await db.query(
+    await pool.query(
       `UPDATE hero_slides SET
         img        = COALESCE(?, img),
         title      = COALESCE(?, title),
@@ -65,7 +65,7 @@ router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
       WHERE id = ?`,
       [img, title, highlight, sub, tag, sort_order, active !== undefined ? (active ? 1 : 0) : undefined, id]
     )
-    const [rows] = await db.query('SELECT * FROM hero_slides WHERE id = ?', [id])
+    const [rows] = await pool.query('SELECT * FROM hero_slides WHERE id = ?', [id])
     if (!rows.length) return res.status(404).json({ success: false, message: 'Slide no encontrado' })
     res.json({ success: true, data: rows[0] })
   } catch (err) {
@@ -78,8 +78,8 @@ router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
 router.patch('/:id/toggle', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params
-    await db.query('UPDATE hero_slides SET active = NOT active WHERE id = ?', [id])
-    const [rows] = await db.query('SELECT * FROM hero_slides WHERE id = ?', [id])
+    await pool.query('UPDATE hero_slides SET active = NOT active WHERE id = ?', [id])
+    const [rows] = await pool.query('SELECT * FROM hero_slides WHERE id = ?', [id])
     res.json({ success: true, data: rows[0] })
   } catch (err) {
     console.error('PATCH /slides/:id/toggle:', err)
@@ -91,9 +91,9 @@ router.patch('/:id/toggle', authenticateToken, requireAdmin, async (req, res) =>
 router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params
-    const [rows] = await db.query('SELECT id FROM hero_slides WHERE id = ?', [id])
+    const [rows] = await pool.query('SELECT id FROM hero_slides WHERE id = ?', [id])
     if (!rows.length) return res.status(404).json({ success: false, message: 'Slide no encontrado' })
-    await db.query('DELETE FROM hero_slides WHERE id = ?', [id])
+    await pool.query('DELETE FROM hero_slides WHERE id = ?', [id])
     res.json({ success: true, message: 'Slide eliminado' })
   } catch (err) {
     console.error('DELETE /slides/:id:', err)
