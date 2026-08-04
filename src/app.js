@@ -98,6 +98,7 @@ app.use('/api/rentals', require('./routes/rentals.routes'));
 app.use('/api/notifications', require('./routes/notifications.routes'));
 app.use('/api/analytics', require('./routes/analytics.routes'));
 app.use('/api/beaches',  beachesRoutes); // ✨ NUEVA RUTA CONGESTIÓN PLAYAS
+app.use('/api/settings', require('./routes/settings.routes'))
 
 // ════════════════════════════════════════════════════════════
 // WEBHOOK DE STRIPE — debe ir ANTES del express.json()

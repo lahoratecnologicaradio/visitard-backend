@@ -1,110 +1,107 @@
 // ============================================================
-// beaches.routes.js — VisitaRD · Rutas de Congestión de Playas
-// Endpoints para check-ins, predicciones y análisis de congestión
+// beaches.routes.js — CaribGo · CRUD + Congestión IA + Check-ins
+// Endpoints completos: playas, fotos, congestión, check-ins
 // ============================================================
 
 const express = require('express');
-const db = require('../config/db'); // ✨ RUTA CORRECTA
-
 const multer = require('multer');
-const upload = multer({ dest: 'uploads/beaches/' });
 const cloudinary = require('cloudinary').v2;
+const { pool } = require('../config/db');
 
 const router = express.Router();
 
-// ✅ 1️⃣ REGISTRAR CHECK-IN (usuario visita playa)
-// POST /api/beaches/checkin
-router.post('/checkin', async (req, res, next) => {
-  try {
-    const { user_id, beach_id, stay_duration } = req.body;
+// ════════════════════════════════════════════════════════════
+// CONFIGURACIÓN MULTER + CLOUDINARY
+// ════════════════════════════════════════════════════════════
 
-    // Validar
-    if (!user_id || !beach_id) {
-      return res.status(400).json({ 
-        success: false,
-        error: 'user_id y beach_id son requeridos' 
-      });
-    }
-
-    // Verificar playa existe
-    const [beach] = await db.query('SELECT id FROM beaches WHERE id = ?', [beach_id]);
-    if (beach.length === 0) {
-      return res.status(404).json({ 
-        success: false,
-        error: 'Playa no encontrada' 
-      });
-    }
-
-    // Insertar check-in
-    await db.query(
-      'INSERT INTO beach_checkins (user_id, beach_id, stay_duration, checkin_time) VALUES (?, ?, ?, NOW())',
-      [user_id, beach_id, stay_duration || null]
-    );
-
-    res.json({ 
-      success: true, 
-      message: 'Check-in registrado exitosamente' 
-    });
-  } catch (err) {
-    next(err);
-  }
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// ✅ 2️⃣ OBTENER TODAS LAS PLAYAS CON CONGESTIÓN ACTUAL
-// GET /api/beaches
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Solo se permiten imágenes'));
+    }
+  },
+});
+
+// ════════════════════════════════════════════════════════════
+// CRUD: PLAYAS
+// ════════════════════════════════════════════════════════════
+
+// GET /api/beaches - Obtener todas las playas con congestión actual
 router.get('/', async (req, res, next) => {
   try {
-    const [beaches] = await db.query(`
+    const [beaches] = await pool.query(`
       SELECT 
         b.id,
         b.name,
         b.type,
+        b.description,
+        b.capacity,
         b.lat,
         b.lng,
-        b.capacity,
-        b.description,
+        b.photos,
         COALESCE(bp.predicted_congestion, 0) as current_congestion,
         COALESCE(bp.level, 'green') as level,
-        COALESCE(bp.predicted_users, 0) as predicted_users
+        COALESCE(bp.predicted_users, 0) as predicted_users,
+        b.created_at,
+        b.updated_at
       FROM beaches b
       LEFT JOIN beach_predictions bp ON b.id = bp.beach_id 
         AND bp.prediction_hour = (
           SELECT MAX(prediction_hour) FROM beach_predictions 
           WHERE beach_id = b.id AND prediction_hour <= NOW()
         )
-      ORDER BY b.name
+      ORDER BY b.name ASC
     `);
 
-    res.json({ 
+    // Parsear JSON de fotos
+    const beachesWithPhotos = beaches.map(beach => ({
+      ...beach,
+      photos: beach.photos ? JSON.parse(beach.photos) : [],
+    }));
+
+    res.json({
       success: true,
-      data: beaches 
+      data: beachesWithPhotos,
+      total: beachesWithPhotos.length,
     });
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    console.error('Error GET /beaches:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// ✅ 3️⃣ OBTENER DETALLES DE UNA PLAYA (próximas 24h)
-// GET /api/beaches/:beach_id
-router.get('/:beach_id', async (req, res, next) => {
+// GET /api/beaches/:id - Obtener playa por ID (próximas 24h)
+router.get('/:id', async (req, res, next) => {
   try {
-    const { beach_id } = req.params;
+    const { id } = req.params;
 
     // Info de la playa
-    const [beach] = await db.query(
+    const [beaches] = await pool.query(
       'SELECT * FROM beaches WHERE id = ?',
-      [beach_id]
+      [id]
     );
 
-    if (beach.length === 0) {
-      return res.status(404).json({ 
-        success: false,
-        error: 'Playa no encontrada' 
-      });
+    if (beaches.length === 0) {
+      return res.status(404).json({ success: false, error: 'Playa no encontrada' });
     }
 
+    const beach = {
+      ...beaches[0],
+      photos: beaches[0].photos ? JSON.parse(beaches[0].photos) : [],
+    };
+
     // Predicciones próximas 24h
-    const [predictions] = await db.query(`
+    const [predictions] = await pool.query(`
       SELECT 
         prediction_hour,
         predicted_congestion,
@@ -115,10 +112,10 @@ router.get('/:beach_id', async (req, res, next) => {
         AND prediction_hour >= NOW()
         AND prediction_hour <= DATE_ADD(NOW(), INTERVAL 24 HOUR)
       ORDER BY prediction_hour ASC
-    `, [beach_id]);
+    `, [id]);
 
     // Mejor hora para visitar
-    const [bestTime] = await db.query(`
+    const [bestTime] = await pool.query(`
       SELECT 
         prediction_hour,
         predicted_congestion,
@@ -129,36 +126,265 @@ router.get('/:beach_id', async (req, res, next) => {
         AND prediction_hour <= DATE_ADD(NOW(), INTERVAL 24 HOUR)
       ORDER BY predicted_congestion ASC
       LIMIT 1
-    `, [beach_id]);
+    `, [id]);
 
     res.json({
       success: true,
       data: {
-        beach: beach[0],
+        beach,
         current: predictions[0] || {},
         hourly_forecast: predictions,
         best_time: bestTime[0] || null,
-        recommendation: generateRecommendation(predictions[0])
-      }
+        recommendation: generateRecommendation(predictions[0]),
+      },
     });
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    console.error('Error GET /beaches/:id:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// ✅ 4️⃣ BÚSQUEDA: "Playas menos concurridas AHORA"
-// GET /api/beaches/search/least-crowded
+// POST /api/beaches - Crear nueva playa
+router.post('/', async (req, res, next) => {
+  try {
+    const { name, type, description, capacity, lat, lng, photos } = req.body;
+
+    if (!name || !type) {
+      return res.status(400).json({
+        success: false,
+        error: 'Nombre y tipo son requeridos',
+      });
+    }
+
+    const photosJSON = photos ? JSON.stringify(photos) : null;
+
+    const [result] = await pool.query(
+      `INSERT INTO beaches (name, type, description, capacity, lat, lng, photos)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [name, type, description || null, capacity || null, lat || null, lng || null, photosJSON]
+    );
+
+    const beach = {
+      id: result.insertId,
+      name,
+      type,
+      description: description || null,
+      capacity: capacity || null,
+      lat: lat || null,
+      lng: lng || null,
+      photos: photos || [],
+    };
+
+    res.status(201).json({
+      success: true,
+      data: beach,
+      message: 'Playa creada exitosamente',
+    });
+  } catch (error) {
+    console.error('Error POST /beaches:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// PUT /api/beaches/:id - Actualizar playa
+router.put('/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { name, type, description, capacity, lat, lng, photos } = req.body;
+
+    // Verificar que existe
+    const [existing] = await pool.query(
+      'SELECT * FROM beaches WHERE id = ?',
+      [id]
+    );
+
+    if (existing.length === 0) {
+      return res.status(404).json({ success: false, error: 'Playa no encontrada' });
+    }
+
+    const photosJSON = photos ? JSON.stringify(photos) : null;
+
+    await pool.query(
+      `UPDATE beaches 
+       SET name = ?, type = ?, description = ?, capacity = ?, lat = ?, lng = ?, photos = ?, updated_at = NOW()
+       WHERE id = ?`,
+      [name || existing[0].name, type || existing[0].type, description, capacity, lat, lng, photosJSON, id]
+    );
+
+    const [updated] = await pool.query(
+      'SELECT * FROM beaches WHERE id = ?',
+      [id]
+    );
+
+    const beach = {
+      ...updated[0],
+      photos: updated[0].photos ? JSON.parse(updated[0].photos) : [],
+    };
+
+    res.json({
+      success: true,
+      data: beach,
+      message: 'Playa actualizada exitosamente',
+    });
+  } catch (error) {
+    console.error('Error PUT /beaches/:id:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// DELETE /api/beaches/:id - Eliminar playa
+router.delete('/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const [result] = await pool.query(
+      'DELETE FROM beaches WHERE id = ?',
+      [id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, error: 'Playa no encontrada' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Playa eliminada exitosamente',
+    });
+  } catch (error) {
+    console.error('Error DELETE /beaches/:id:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ════════════════════════════════════════════════════════════
+// FOTOS: UPLOAD A CLOUDINARY
+// ════════════════════════════════════════════════════════════
+
+// POST /api/beaches/upload-photo - Subir foto a Cloudinary
+router.post('/upload-photo', upload.single('file'), async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No se envió archivo' });
+    }
+
+    // Subir a Cloudinary
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: 'caribgo/beaches',
+        resource_type: 'auto',
+      },
+      async (error, result) => {
+        if (error) {
+          console.error('Error Cloudinary:', error);
+          return res.status(500).json({ success: false, error: 'Error al subir foto' });
+        }
+
+        res.json({
+          success: true,
+          url: result.secure_url,
+          public_id: result.public_id,
+        });
+      }
+    );
+
+    uploadStream.end(req.file.buffer);
+  } catch (error) {
+    console.error('Error POST /upload-photo:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /api/beaches/:beach_id/photos - Upload base64 a Cloudinary
+router.post('/:beach_id/photos/upload', async (req, res, next) => {
+  try {
+    const { beach_id } = req.params;
+    const { image_base64 } = req.body;
+
+    if (!image_base64) {
+      return res.status(400).json({ success: false, error: 'image_base64 requerido' });
+    }
+
+    // Subir a Cloudinary
+    const result = await cloudinary.uploader.upload(`data:image/jpeg;base64,${image_base64}`, {
+      folder: `caribgo/beaches/${beach_id}`,
+    });
+
+    // Guardar URL en BD
+    const [beach] = await pool.query('SELECT photos FROM beaches WHERE id = ?', [beach_id]);
+    let photos = beach[0]?.photos ? JSON.parse(beach[0].photos) : [];
+    photos.push(result.secure_url);
+
+    await pool.query('UPDATE beaches SET photos = ? WHERE id = ?', [
+      JSON.stringify(photos),
+      beach_id,
+    ]);
+
+    res.json({ success: true, url: result.secure_url });
+  } catch (error) {
+    console.error('Error POST /photos/upload:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ════════════════════════════════════════════════════════════
+// CHECK-INS: REGISTRAR VISITAS
+// ════════════════════════════════════════════════════════════
+
+// POST /api/beaches/checkin - Registrar check-in (usuario visita playa)
+router.post('/checkin', async (req, res, next) => {
+  try {
+    const { user_id, beach_id, stay_duration } = req.body;
+
+    if (!user_id || !beach_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'user_id y beach_id son requeridos',
+      });
+    }
+
+    // Verificar playa existe
+    const [beach] = await pool.query('SELECT id FROM beaches WHERE id = ?', [beach_id]);
+    if (beach.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Playa no encontrada',
+      });
+    }
+
+    // Insertar check-in
+    await pool.query(
+      'INSERT INTO beach_checkins (user_id, beach_id, stay_duration, checkin_time) VALUES (?, ?, ?, NOW())',
+      [user_id, beach_id, stay_duration || null]
+    );
+
+    res.json({
+      success: true,
+      message: 'Check-in registrado exitosamente',
+    });
+  } catch (error) {
+    console.error('Error POST /checkin:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ════════════════════════════════════════════════════════════
+// BÚSQUEDAS: PLAYAS MENOS CONCURRIDAS
+// ════════════════════════════════════════════════════════════
+
+// GET /api/beaches/search/least-crowded - Playas menos concurridas AHORA
 router.get('/search/least-crowded', async (req, res, next) => {
   try {
-    const [beaches] = await db.query(`
+    const [beaches] = await pool.query(`
       SELECT 
         b.id,
         b.name,
         b.type,
         b.lat,
         b.lng,
+        b.capacity,
         COALESCE(bp.predicted_congestion, 0) as congestion,
-        COALESCE(bp.level, 'green') as level
+        COALESCE(bp.level, 'green') as level,
+        COALESCE(bp.predicted_users, 0) as predicted_users
       FROM beaches b
       LEFT JOIN beach_predictions bp ON b.id = bp.beach_id 
         AND bp.prediction_hour = (
@@ -169,26 +395,30 @@ router.get('/search/least-crowded', async (req, res, next) => {
       LIMIT 5
     `);
 
-    res.json({ 
+    res.json({
       success: true,
-      data: beaches 
+      data: beaches,
     });
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    console.error('Error GET /search/least-crowded:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// ✅ 5️⃣ ESTADÍSTICAS DE VISITANTES (últimos 30 días)
-// GET /api/beaches/:beach_id/stats
+// ════════════════════════════════════════════════════════════
+// ESTADÍSTICAS: VISITANTES Y CONGESTIÓN
+// ════════════════════════════════════════════════════════════
+
+// GET /api/beaches/:beach_id/stats - Estadísticas (últimos 30 días)
 router.get('/:beach_id/stats', async (req, res, next) => {
   try {
     const { beach_id } = req.params;
 
-    const [stats] = await db.query(`
+    const [stats] = await pool.query(`
       SELECT 
         HOUR(checkin_time) as hour,
         COUNT(*) as visitor_count,
-        AVG(stay_duration) as avg_stay_minutes
+        AVG(COALESCE(stay_duration, 120)) as avg_stay_minutes
       FROM beach_checkins
       WHERE beach_id = ?
         AND checkin_time >= DATE_SUB(NOW(), INTERVAL 30 DAY)
@@ -196,12 +426,13 @@ router.get('/:beach_id/stats', async (req, res, next) => {
       ORDER BY hour ASC
     `, [beach_id]);
 
-    res.json({ 
+    res.json({
       success: true,
-      data: stats 
+      data: stats,
     });
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    console.error('Error GET /stats:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -214,7 +445,7 @@ router.get('/:beach_id/stats', async (req, res, next) => {
  */
 function generateRecommendation(prediction) {
   if (!prediction) return null;
-  
+
   switch (prediction.level) {
     case 'green':
       return '🟢 Poco concurrido - Excelente momento para visitar';
@@ -226,59 +457,5 @@ function generateRecommendation(prediction) {
       return null;
   }
 }
-
-
-
-router.post('/:beach_id/photos', upload.single('photo'), async (req, res, next) => {
-  try {
-    const { beach_id } = req.params;
-    const photoUrl = `/uploads/beaches/${req.file.filename}`;
-
-    // Obtener fotos actuales
-    const [beach] = await db.query('SELECT photos FROM beaches WHERE id = ?', [beach_id]);
-    let photos = beach[0]?.photos ? JSON.parse(beach[0].photos) : [];
-
-    // Agregar nueva foto
-    photos.push(photoUrl);
-
-    // Guardar
-    await db.query('UPDATE beaches SET photos = ? WHERE id = ?', [
-      JSON.stringify(photos),
-      beach_id,
-    ]);
-
-    res.json({ success: true, photos });
-  } catch (err) {
-    next(err);
-  }
-});
-
-
-
-router.post('/:beach_id/photos/upload', async (req, res, next) => {
-  try {
-    const { beach_id } = req.params;
-    const { image_base64 } = req.body;
-
-    // Subir a Cloudinary
-    const result = await cloudinary.uploader.upload(`data:image/jpeg;base64,${image_base64}`, {
-      folder: `beaches/${beach_id}`,
-    });
-
-    // Guardar URL en BD
-    const [beach] = await db.query('SELECT photos FROM beaches WHERE id = ?', [beach_id]);
-    let photos = beach[0]?.photos ? JSON.parse(beach[0].photos) : [];
-    photos.push(result.secure_url);
-
-    await db.query('UPDATE beaches SET photos = ? WHERE id = ?', [
-      JSON.stringify(photos),
-      beach_id,
-    ]);
-
-    res.json({ success: true, url: result.secure_url });
-  } catch (err) {
-    next(err);
-  }
-});
 
 module.exports = router;
