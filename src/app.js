@@ -1,13 +1,11 @@
 // ============================================================
-// app.js — VisitaRD Backend · Express App
-// Configura middleware, rutas, y manejo de errores
+// app.js — CaribGo Backend · Express App
 // ============================================================
 
 require('dotenv').config();
 const express    = require('express');
 const cors       = require('cors');
 const helmet     = require('helmet');
-const path       = require('path');
 
 // ── Rutas ────────────────────────────────────────────────────
 const authRoutes     = require('./routes/auth.routes');
@@ -18,20 +16,17 @@ const placeRoutes    = require('./routes/places.routes');
 const aiRoutes       = require('./routes/ai.routes');
 const adminRoutes    = require('./routes/admin.routes');
 const reviewRoutes   = require('./routes/reviews.routes');
-const beachesRoutes  = require('./routes/beaches.routes'); // ✨ NUEVA RUTA PLAYAS
+const beachesRoutes  = require('./routes/beaches.routes');
 
 const app = express();
 
 // ════════════════════════════════════════════════════════════
 // MIDDLEWARE GLOBAL
 // ════════════════════════════════════════════════════════════
-
-// Seguridad HTTP headers
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 
-// CORS — permite web (Netlify), admin (Netlify) y app móvil
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
   .map(o => o.trim())
@@ -39,7 +34,6 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Permitir requests sin origin (Postman, app móvil, Railway health checks)
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
       return callback(null, true);
@@ -51,11 +45,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// Parsear JSON y URL-encoded
-app.use(express.json({ limit: '10mb' }));         // 10mb para imágenes base64 (IA)
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Logger simple en desarrollo
 if (process.env.NODE_ENV !== 'production') {
   app.use((req, _res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
@@ -64,12 +56,12 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // ════════════════════════════════════════════════════════════
-// HEALTH CHECK — Railway lo usa para saber si el server vive
+// HEALTH CHECK
 // ════════════════════════════════════════════════════════════
 app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
-    app: 'VisitaRD API',
+    app: 'CaribGo API',
     version: '1.0.0',
     timestamp: new Date().toISOString(),
   });
@@ -78,34 +70,31 @@ app.get('/api/health', (_req, res) => {
 // ════════════════════════════════════════════════════════════
 // RUTAS DE LA API
 // ════════════════════════════════════════════════════════════
-app.use('/api/auth',     authRoutes);
-app.use('/api/trips',    tripRoutes);
-app.use('/api/bookings', bookingRoutes);
-app.use('/api/tracking', trackingRoutes);
-app.use('/api/places',   placeRoutes);
-app.use('/api/ai',       aiRoutes);
-app.use('/api/reviews',  reviewRoutes);
-app.use('/api/admin',    adminRoutes);
-app.use('/api/media', require('./routes/media.routes'));
-app.use('/api/videos', require('./routes/videos.routes'));
-app.use('/api/buses',        require('./routes/buses.routes'));
-app.use('/api/guides',       require('./routes/guides.routes'));
+app.use('/api/auth',           authRoutes);
+app.use('/api/trips',          tripRoutes);
+app.use('/api/bookings',       bookingRoutes);
+app.use('/api/tracking',       trackingRoutes);
+app.use('/api/places',         placeRoutes);
+app.use('/api/ai',             aiRoutes);
+app.use('/api/reviews',        reviewRoutes);
+app.use('/api/admin',          adminRoutes);
+app.use('/api/media',          require('./routes/media.routes'));
+app.use('/api/videos',         require('./routes/videos.routes'));
+app.use('/api/buses',          require('./routes/buses.routes'));
+app.use('/api/guides',         require('./routes/guides.routes'));
 app.use('/api/accommodations', require('./routes/accommodations.routes'));
-app.use('/api/food',         require('./routes/food_vendors.routes'));
-app.use('/api/requests',     require('./routes/service_requests.routes'));
-app.use('/api/transport', require('./routes/transport.routes'));
-app.use('/api/rentals', require('./routes/rentals.routes'));
-app.use('/api/notifications', require('./routes/notifications.routes'));
-app.use('/api/analytics', require('./routes/analytics.routes'));
-app.use('/api/beaches',  beachesRoutes); // ✨ NUEVA RUTA CONGESTIÓN PLAYAS
-app.use('/api/settings', require('./routes/settings.routes'))
-app.use('/api/trips', require('./routes/trips.routes'))
-app.use('/api/buses', require('./routes/buses.routes'))
-app.use('/api/slides', require('./routes/slides.routes'))
+app.use('/api/food',           require('./routes/food_vendors.routes'));
+app.use('/api/requests',       require('./routes/service_requests.routes'));
+app.use('/api/transport',      require('./routes/transport.routes'));
+app.use('/api/rentals',        require('./routes/rentals.routes'));
+app.use('/api/notifications',  require('./routes/notifications.routes'));
+app.use('/api/analytics',      require('./routes/analytics.routes'));
+app.use('/api/beaches',        beachesRoutes);
+app.use('/api/settings',       require('./routes/settings.routes'));
+app.use('/api/slides',         require('./routes/slides.routes'));
 
 // ════════════════════════════════════════════════════════════
-// WEBHOOK DE STRIPE — debe ir ANTES del express.json()
-// (Stripe necesita el body raw, no parseado)
+// WEBHOOK DE STRIPE
 // ════════════════════════════════════════════════════════════
 app.post(
   '/api/webhooks/stripe',
@@ -125,31 +114,24 @@ app.use((_req, res) => {
 
 // ════════════════════════════════════════════════════════════
 // MANEJADOR GLOBAL DE ERRORES
-// Cualquier next(error) termina aquí
 // ════════════════════════════════════════════════════════════
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
   console.error('[Error]', err.message);
 
-  // Error de validación de CORS
   if (err.message && err.message.startsWith('CORS')) {
     return res.status(403).json({ success: false, message: err.message });
   }
-
-  // Error de JWT
   if (err.name === 'JsonWebTokenError') {
-    return res.status(401).json({ success: false, message: 'Token inválido' });
+    return res.status(401).json({ success: false, message: 'Token invalido' });
   }
   if (err.name === 'TokenExpiredError') {
     return res.status(401).json({ success: false, message: 'Token expirado' });
   }
-
-  // Error de Stripe
   if (err.type && err.type.startsWith('Stripe')) {
     return res.status(400).json({ success: false, message: err.message });
   }
 
-  // Error genérico
   const status  = err.status || err.statusCode || 500;
   const message = err.message || 'Error interno del servidor';
 
