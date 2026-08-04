@@ -1,5 +1,5 @@
-// routes/media.routes.js — VisitaRD
-// Sube imágenes a Cloudinary y retorna la URL
+﻿// routes/media.routes.js â€” VisitaRD
+// Sube imÃ¡genes a Cloudinary y retorna la URL
 const router     = require('express').Router()
 const cloudinary = require('../config/cloudinary')
 const upload     = require('../middleware/upload')
@@ -16,7 +16,7 @@ router.post(
   async (req, res, next) => {
     try {
       if (!req.file) {
-        return res.status(400).json({ success: false, message: 'No se recibió ninguna imagen' })
+        return res.status(400).json({ success: false, message: 'No se recibiÃ³ ninguna imagen' })
       }
 
       // Subir a Cloudinary desde buffer en memoria
@@ -30,7 +30,7 @@ router.post(
             ],
           },
           (error, result) => {
-            if (error) reject(error)
+            if (error) { console.error('Cloudinary error:', error); reject(error); }
             else resolve(result)
           }
         )
@@ -50,7 +50,7 @@ router.post(
   }
 )
 
-// DELETE /api/media/:public_id — eliminar imagen de Cloudinary
+// DELETE /api/media/:public_id â€” eliminar imagen de Cloudinary
 router.delete('/:public_id(*)', authenticate, authorize('admin'), async (req, res, next) => {
   try {
     await cloudinary.uploader.destroy(req.params.public_id)
@@ -61,3 +61,4 @@ router.delete('/:public_id(*)', authenticate, authorize('admin'), async (req, re
 })
 
 module.exports = router
+
