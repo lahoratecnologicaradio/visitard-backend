@@ -1,4 +1,4 @@
-// routes/ai.flyer.js — CaribGo · Extracción de datos de flyer con Claude Vision
+﻿// routes/ai.flyer.js â€” CaribGo Â· ExtracciÃ³n de datos de flyer con Claude Vision
 const express  = require('express')
 const router   = express.Router()
 const Anthropic = require('@anthropic-ai/sdk')
@@ -24,8 +24,8 @@ router.post('/extract-flyer', async (req, res) => {
           },
           {
             type: 'text',
-            text: `Analiza este flyer de tour turístico dominicano y extrae los datos.
-Responde SOLO con JSON válido sin texto adicional ni backticks:
+            text: `Analiza este flyer de tour turÃ­stico dominicano y extrae los datos.
+Responde SOLO con JSON vÃ¡lido sin texto adicional ni backticks:
 {
   "title": "nombre completo del tour",
   "origin": "ciudad/lugar de salida",
@@ -45,7 +45,7 @@ Responde SOLO con JSON válido sin texto adicional ni backticks:
 Reglas:
 - price: solo el numero del precio adulto en RD$ sin simbolos
 - seats: cupos disponibles, si no especifica usa 40
-- departure_at: formato exacto YYYY-MM-DDTHH:MM, si no hay año usar 2026
+- departure_at: formato exacto YYYY-MM-DDTHH:MM, si no hay aÃ±o usar 2026
 - includes: lista de lo que incluye separado por comas
 - Para coordenadas de Santo Domingo usa lat:18.4884 lng:-69.9229
 - Para coordenadas de Samana usa lat:19.2065 lng:-69.3360
@@ -68,10 +68,11 @@ Reglas:
     }
 
     res.json({ success: true, data: parsed })
-  } catch (err: any) {
+  } catch (err) {
     console.error('extract-flyer error:', err)
     res.status(500).json({ success: false, message: err.message })
   }
 })
 
 module.exports = router
+
