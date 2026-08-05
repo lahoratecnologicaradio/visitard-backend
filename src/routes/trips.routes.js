@@ -1,6 +1,6 @@
-﻿// ============================================================
-// routes/trips.routes.js â€” VisitaRD
-// CRUD de viajes + bÃºsqueda tipo Uber con mapa
+// ============================================================
+// routes/trips.routes.js - CaribGo
+// CRUD de viajes + busqueda tipo Uber con mapa
 // ============================================================
 
 const router = require('express').Router();
@@ -8,19 +8,15 @@ const db     = require('../config/db');
 const redis  = require('../config/redis');
 const { authenticate, authorize } = require('../middleware/auth');
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// GET /api/trips â€” listar viajes disponibles
-// Query params: origin, destination, date, page, limit
-// PÃºblico â€” turistas y anÃ³nimos pueden ver viajes
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// GET /api/trips - listar viajes disponibles
 router.get('/', async (req, res, next) => {
   try {
     const {
       origin,
       destination,
       date,
-      page  = 1,
-      limit = 20,
+      page   = 1,
+      limit  = 20,
       status = 'scheduled',
     } = req.query;
 
@@ -31,9 +27,10 @@ router.get('/', async (req, res, next) => {
         t.id, t.title, t.origin, t.destination,
         t.origin_lat, t.origin_lng, t.dest_lat, t.dest_lng,
         t.departure_at, t.seats, t.seats_available,
-        t.price, t.status, t.bus_plate, t.image_url, t.description, t.includes,
-        a.name  AS agency_name,
-        a.logo  AS agency_logo,
+        t.price, t.status, t.bus_plate,
+        t.image_url, t.description, t.includes,
+        a.name   AS agency_name,
+        a.logo   AS agency_logo,
         a.rating AS agency_rating,
         u.avatar AS agency_avatar
       FROM trips t
@@ -64,22 +61,21 @@ router.get('/', async (req, res, next) => {
 
     const [trips] = await db.query(sql, params);
 
-    // Para cada viaje activo, adjuntar Ãºltima ubicaciÃ³n GPS de Redis
     const tripsWithLocation = await Promise.all(
-    trips.map(async (trip) => {
-      let current_location = null;
-      try {
-        const loc = await Promise.race([
-          redis.get(`trip:tracking:${trip.id}`),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 500))
-        ]);
-        current_location = loc ? JSON.parse(loc) : null;
-      } catch {
-        current_location = null;
-      }
-      return { ...trip, current_location };
-    })
-  );
+      trips.map(async (trip) => {
+        let current_location = null;
+        try {
+          const loc = await Promise.race([
+            redis.get(`trip:tracking:${trip.id}`),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 500))
+          ]);
+          current_location = loc ? JSON.parse(loc) : null;
+        } catch {
+          current_location = null;
+        }
+        return { ...trip, current_location };
+      })
+    );
 
     res.json({ success: true, data: tripsWithLocation, page: parseInt(page) });
   } catch (err) {
@@ -87,9 +83,7 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// GET /api/trips/:id â€” detalle de un viaje
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// GET /api/trips/:id - detalle de un viaje
 router.get('/:id', async (req, res, next) => {
   try {
     const [rows] = await db.query(
@@ -111,11 +105,9 @@ router.get('/:id', async (req, res, next) => {
 
     const trip = rows[0];
 
-    // Adjuntar tracking actual
     const loc = await redis.get(`trip:tracking:${trip.id}`);
     trip.current_location = loc ? JSON.parse(loc) : null;
 
-    // Adjuntar reseÃ±as recientes de este viaje / agencia
     const [reviews] = await db.query(
       `SELECT r.rating, r.comment, u.name AS reviewer_name, u.avatar, r.created_at
        FROM reviews r
@@ -133,18 +125,16 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// POST /api/trips â€” crear viaje (solo agencias)
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// POST /api/trips - crear viaje (agencias y admin)
 router.post('/', authenticate, authorize('agency', 'admin'), async (req, res, next) => {
   try {
     const {
-      title, description,
+      title, description, image_url, includes,
       origin, destination,
       origin_lat, origin_lng,
       dest_lat, dest_lng,
       departure_at, seats, price,
-      bus_plate,
+      bus_plate, agency_id: bodyAgencyId,
     } = req.body;
 
     if (!title || !origin || !destination || !departure_at || !seats || !price) {
@@ -154,25 +144,33 @@ router.post('/', authenticate, authorize('agency', 'admin'), async (req, res, ne
       });
     }
 
-    // Obtener agency_id del usuario logueado
-    const [agRows] = await db.query(
-      'SELECT id FROM agencies WHERE user_id = ?',
-      [req.user.id]
-    );
-    if (!agRows.length) {
-      return res.status(403).json({ success: false, message: 'Cuenta de agencia no encontrada' });
+    let agency_id = bodyAgencyId;
+
+    // Si no viene agency_id en el body (agencia logueada), buscarlo
+    if (!agency_id) {
+      const [agRows] = await db.query(
+        'SELECT id FROM agencies WHERE user_id = ?',
+        [req.user.id]
+      );
+      if (!agRows.length) {
+        return res.status(403).json({ success: false, message: 'Cuenta de agencia no encontrada' });
+      }
+      agency_id = agRows[0].id;
     }
 
-    const agency_id = agRows[0].id;
+    const includesVal = includes
+      ? (Array.isArray(includes) ? JSON.stringify(includes) : includes)
+      : null;
 
     const [result] = await db.query(
       `INSERT INTO trips
-         (agency_id, title, description, origin, destination,
+         (agency_id, title, description, image_url, includes,
+          origin, destination,
           origin_lat, origin_lng, dest_lat, dest_lng,
           departure_at, seats, seats_available, price, bus_plate)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        agency_id, title, description || null,
+        agency_id, title, description || null, image_url || null, includesVal,
         origin, destination,
         origin_lat || null, origin_lng || null,
         dest_lat   || null, dest_lng   || null,
@@ -191,19 +189,20 @@ router.post('/', authenticate, authorize('agency', 'admin'), async (req, res, ne
   }
 });
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// PATCH /api/trips/:id â€” actualizar viaje (agencia dueÃ±a o admin)
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// PATCH /api/trips/:id - actualizar viaje
 router.patch('/:id', authenticate, authorize('agency', 'admin'), async (req, res, next) => {
   try {
     const {
       title, description, price, seats, departure_at,
       status, bus_plate, image_url, includes,
-      origin, destination: dest, origin_lat, origin_lng, dest_lat, dest_lng
+      origin, destination: dest,
+      origin_lat, origin_lng, dest_lat, dest_lng,
     } = req.body;
+
     const includesVal = includes
       ? (Array.isArray(includes) ? JSON.stringify(includes) : includes)
       : null;
+
     await db.query(
       `UPDATE trips SET
          title        = COALESCE(?, title),
@@ -223,17 +222,30 @@ router.patch('/:id', authenticate, authorize('agency', 'admin'), async (req, res
          bus_plate    = COALESCE(?, bus_plate),
          updated_at   = NOW()
        WHERE id = ?`,
-      [title, image_url, description, includesVal, origin, dest,
-       origin_lat || null, origin_lng || null, dest_lat || null, dest_lng || null,
-       price, seats, departure_at, status, bus_plate, req.params.id]
+      [
+        title, image_url, description, includesVal,
+        origin, dest,
+        origin_lat || null, origin_lng || null,
+        dest_lat   || null, dest_lng   || null,
+        price, seats, departure_at, status, bus_plate,
+        req.params.id,
+      ]
     );
+
     res.json({ success: true, message: 'Viaje actualizado' });
   } catch (err) {
     next(err);
   }
-}); = router;
+});
 
+// DELETE /api/trips/:id - solo admin
+router.delete('/:id', authenticate, authorize('admin'), async (req, res, next) => {
+  try {
+    await db.query('DELETE FROM trips WHERE id = ?', [req.params.id]);
+    res.json({ success: true, message: 'Viaje eliminado' });
+  } catch (err) {
+    next(err);
+  }
+});
 
-
-
-
+module.exports = router;
