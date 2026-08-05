@@ -1,6 +1,6 @@
-// ============================================================
-// routes/trips.routes.js — VisitaRD
-// CRUD de viajes + búsqueda tipo Uber con mapa
+﻿// ============================================================
+// routes/trips.routes.js â€” VisitaRD
+// CRUD de viajes + bÃºsqueda tipo Uber con mapa
 // ============================================================
 
 const router = require('express').Router();
@@ -8,11 +8,11 @@ const db     = require('../config/db');
 const redis  = require('../config/redis');
 const { authenticate, authorize } = require('../middleware/auth');
 
-// ════════════════════════════════════════════════════════════
-// GET /api/trips — listar viajes disponibles
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// GET /api/trips â€” listar viajes disponibles
 // Query params: origin, destination, date, page, limit
-// Público — turistas y anónimos pueden ver viajes
-// ════════════════════════════════════════════════════════════
+// PÃºblico â€” turistas y anÃ³nimos pueden ver viajes
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 router.get('/', async (req, res, next) => {
   try {
     const {
@@ -31,7 +31,7 @@ router.get('/', async (req, res, next) => {
         t.id, t.title, t.origin, t.destination,
         t.origin_lat, t.origin_lng, t.dest_lat, t.dest_lng,
         t.departure_at, t.seats, t.seats_available,
-        t.price, t.status, t.bus_plate,
+        t.price, t.status, t.bus_plate, t.image_url, t.description, t.includes,
         a.name  AS agency_name,
         a.logo  AS agency_logo,
         a.rating AS agency_rating,
@@ -64,7 +64,7 @@ router.get('/', async (req, res, next) => {
 
     const [trips] = await db.query(sql, params);
 
-    // Para cada viaje activo, adjuntar última ubicación GPS de Redis
+    // Para cada viaje activo, adjuntar Ãºltima ubicaciÃ³n GPS de Redis
     const tripsWithLocation = await Promise.all(
     trips.map(async (trip) => {
       let current_location = null;
@@ -87,9 +87,9 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-// ════════════════════════════════════════════════════════════
-// GET /api/trips/:id — detalle de un viaje
-// ════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// GET /api/trips/:id â€” detalle de un viaje
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 router.get('/:id', async (req, res, next) => {
   try {
     const [rows] = await db.query(
@@ -115,7 +115,7 @@ router.get('/:id', async (req, res, next) => {
     const loc = await redis.get(`trip:tracking:${trip.id}`);
     trip.current_location = loc ? JSON.parse(loc) : null;
 
-    // Adjuntar reseñas recientes de este viaje / agencia
+    // Adjuntar reseÃ±as recientes de este viaje / agencia
     const [reviews] = await db.query(
       `SELECT r.rating, r.comment, u.name AS reviewer_name, u.avatar, r.created_at
        FROM reviews r
@@ -133,9 +133,9 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
-// ════════════════════════════════════════════════════════════
-// POST /api/trips — crear viaje (solo agencias)
-// ════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// POST /api/trips â€” crear viaje (solo agencias)
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 router.post('/', authenticate, authorize('agency', 'admin'), async (req, res, next) => {
   try {
     const {
@@ -191,9 +191,9 @@ router.post('/', authenticate, authorize('agency', 'admin'), async (req, res, ne
   }
 });
 
-// ════════════════════════════════════════════════════════════
-// PATCH /api/trips/:id — actualizar viaje (agencia dueña o admin)
-// ════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// PATCH /api/trips/:id â€” actualizar viaje (agencia dueÃ±a o admin)
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 router.patch('/:id', authenticate, authorize('agency', 'admin'), async (req, res, next) => {
   try {
     const { title, description, price, seats, departure_at, status, bus_plate } = req.body;
@@ -217,9 +217,9 @@ router.patch('/:id', authenticate, authorize('agency', 'admin'), async (req, res
   }
 });
 
-// ════════════════════════════════════════════════════════════
-// DELETE /api/trips/:id — solo admin
-// ════════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// DELETE /api/trips/:id â€” solo admin
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 router.delete('/:id', authenticate, authorize('admin'), async (req, res, next) => {
   try {
     await db.query('DELETE FROM trips WHERE id = ?', [req.params.id]);
@@ -230,3 +230,4 @@ router.delete('/:id', authenticate, authorize('admin'), async (req, res, next) =
 });
 
 module.exports = router;
+
