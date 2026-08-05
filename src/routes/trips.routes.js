@@ -228,7 +228,7 @@ router.patch('/:id', authenticate, authorize('agency', 'admin'), async (req, res
         origin, dest,
         origin_lat || null, origin_lng || null,
         dest_lat   || null, dest_lng   || null,
-        price, seats, departure_at, status, bus_plate, currency || 'DOP', currency || 'DOP', currency || 'DOP',
+        price, seats, departure_at, status, bus_plate, currency || 'DOP',
         req.params.id,
       ]
     );
@@ -250,6 +250,7 @@ router.delete('/:id', authenticate, authorize('admin'), async (req, res, next) =
 });
 
 module.exports = router;
+
 
 
 
