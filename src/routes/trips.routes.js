@@ -196,19 +196,27 @@ router.post('/', authenticate, authorize('agency', 'admin'), async (req, res, ne
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 router.patch('/:id', authenticate, authorize('agency', 'admin'), async (req, res, next) => {
   try {
-    const { title, description, price, seats, departure_at, status, bus_plate } = req.body;
+    const { title, description, price, seats, departure_at, status, bus_plate, image_url, includes, origin, destination, origin_lat, origin_lng, dest_lat, dest_lng } = req.body;
 
     await db.query(
       `UPDATE trips SET
          title        = COALESCE(?, title),
+         image_url    = COALESCE(?, image_url),
          description  = COALESCE(?, description),
+         includes     = COALESCE(?, includes),
+         origin       = COALESCE(?, origin),
+         destination  = COALESCE(?, destination),
+         origin_lat   = COALESCE(?, origin_lat),
+         origin_lng   = COALESCE(?, origin_lng),
+         dest_lat     = COALESCE(?, dest_lat),
+         dest_lng     = COALESCE(?, dest_lng),
          price        = COALESCE(?, price),
          seats        = COALESCE(?, seats),
          departure_at = COALESCE(?, departure_at),
          status       = COALESCE(?, status),
          bus_plate    = COALESCE(?, bus_plate)
        WHERE id = ?`,
-      [title, description, price, seats, departure_at, status, bus_plate, req.params.id]
+      [title, image_url, description, Array.isArray(includes) ? JSON.stringify(includes) : includes, origin, destination, origin_lat || null, origin_lng || null, dest_lat || null, dest_lng || null, description, price, seats, departure_at, status, bus_plate, req.params.id]
     );
 
     res.json({ success: true, message: 'Viaje actualizado' });
@@ -230,4 +238,7 @@ router.delete('/:id', authenticate, authorize('admin'), async (req, res, next) =
 });
 
 module.exports = router;
+
+
+
 
