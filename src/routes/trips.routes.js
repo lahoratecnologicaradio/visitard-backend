@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 // routes/trips.routes.js - CaribGo
 // CRUD de viajes + busqueda tipo Uber con mapa
 // ============================================================
@@ -27,7 +27,7 @@ router.get('/', async (req, res, next) => {
         t.id, t.title, t.origin, t.destination,
         t.origin_lat, t.origin_lng, t.dest_lat, t.dest_lng,
         t.departure_at, t.seats, t.seats_available,
-        t.price, t.status, t.bus_plate,
+        t.price, t.status, t.bus_plate, t.currency,
         t.image_url, t.description, t.includes,
         a.name   AS agency_name,
         a.logo   AS agency_logo,
@@ -194,7 +194,7 @@ router.patch('/:id', authenticate, authorize('agency', 'admin'), async (req, res
   try {
     const {
       title, description, price, seats, departure_at,
-      status, bus_plate, image_url, includes,
+      status, bus_plate, image_url, includes, currency,
       origin, destination: dest,
       origin_lat, origin_lng, dest_lat, dest_lng,
     } = req.body;
@@ -220,6 +220,7 @@ router.patch('/:id', authenticate, authorize('agency', 'admin'), async (req, res
          departure_at = COALESCE(?, departure_at),
          status       = COALESCE(?, status),
          bus_plate    = COALESCE(?, bus_plate),
+         currency     = COALESCE(?, currency),
          updated_at   = NOW()
        WHERE id = ?`,
       [
@@ -227,7 +228,7 @@ router.patch('/:id', authenticate, authorize('agency', 'admin'), async (req, res
         origin, dest,
         origin_lat || null, origin_lng || null,
         dest_lat   || null, dest_lng   || null,
-        price, seats, departure_at, status, bus_plate,
+        price, seats, departure_at, status, bus_plate, currency || 'DOP', currency || 'DOP', currency || 'DOP',
         req.params.id,
       ]
     );
@@ -249,3 +250,7 @@ router.delete('/:id', authenticate, authorize('admin'), async (req, res, next) =
 });
 
 module.exports = router;
+
+
+
+
