@@ -196,8 +196,14 @@ router.post('/', authenticate, authorize('agency', 'admin'), async (req, res, ne
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 router.patch('/:id', authenticate, authorize('agency', 'admin'), async (req, res, next) => {
   try {
-    const { title, description, price, seats, departure_at, status, bus_plate, image_url, includes, origin, destination, origin_lat, origin_lng, dest_lat, dest_lng } = req.body;
-
+    const {
+      title, description, price, seats, departure_at,
+      status, bus_plate, image_url, includes,
+      origin, destination: dest, origin_lat, origin_lng, dest_lat, dest_lng
+    } = req.body;
+    const includesVal = includes
+      ? (Array.isArray(includes) ? JSON.stringify(includes) : includes)
+      : null;
     await db.query(
       `UPDATE trips SET
          title        = COALESCE(?, title),
@@ -214,30 +220,19 @@ router.patch('/:id', authenticate, authorize('agency', 'admin'), async (req, res
          seats        = COALESCE(?, seats),
          departure_at = COALESCE(?, departure_at),
          status       = COALESCE(?, status),
-         bus_plate    = COALESCE(?, bus_plate)
+         bus_plate    = COALESCE(?, bus_plate),
+         updated_at   = NOW()
        WHERE id = ?`,
-      [title, image_url, description, Array.isArray(includes) ? JSON.stringify(includes) : includes, origin, destination, origin_lat || null, origin_lng || null, dest_lat || null, dest_lng || null, description, price, seats, departure_at, status, bus_plate, req.params.id]
+      [title, image_url, description, includesVal, origin, dest,
+       origin_lat || null, origin_lng || null, dest_lat || null, dest_lng || null,
+       price, seats, departure_at, status, bus_plate, req.params.id]
     );
-
     res.json({ success: true, message: 'Viaje actualizado' });
   } catch (err) {
     next(err);
   }
-});
+}); = router;
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// DELETE /api/trips/:id â€” solo admin
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-router.delete('/:id', authenticate, authorize('admin'), async (req, res, next) => {
-  try {
-    await db.query('DELETE FROM trips WHERE id = ?', [req.params.id]);
-    res.json({ success: true, message: 'Viaje eliminado' });
-  } catch (err) {
-    next(err);
-  }
-});
-
-module.exports = router;
 
 
 
