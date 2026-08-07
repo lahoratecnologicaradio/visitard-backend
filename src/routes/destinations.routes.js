@@ -2,6 +2,19 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 
+// Helper para parsear aliases de forma robusta
+const parseAliases = (aliases) => {
+  if (!aliases) return [];
+  if (typeof aliases === 'string') {
+    try {
+      return JSON.parse(aliases);
+    } catch (e) {
+      return [];
+    }
+  }
+  return Array.isArray(aliases) ? aliases : [];
+};
+
 // ── GET TODOS LOS DESTINOS ──
 router.get('/', async (req, res) => {
   try {
@@ -13,10 +26,9 @@ router.get('/', async (req, res) => {
     `;
     const [results] = await db.query(query);
     
-    // Parse aliases (JSON)
     const destinations = results.map(d => ({
       ...d,
-      aliases: d.aliases ? JSON.parse(d.aliases) : []
+      aliases: parseAliases(d.aliases)
     }));
 
     res.json({ success: true, data: destinations });
@@ -41,7 +53,7 @@ router.get('/search/:query', async (req, res) => {
     
     const destinations = results.map(d => ({
       ...d,
-      aliases: d.aliases ? JSON.parse(d.aliases) : []
+      aliases: parseAliases(d.aliases)
     }));
 
     res.json({ success: true, data: destinations });
@@ -67,7 +79,7 @@ router.get('/:id', async (req, res) => {
 
     const destination = {
       ...results[0],
-      aliases: results[0].aliases ? JSON.parse(results[0].aliases) : []
+      aliases: parseAliases(results[0].aliases)
     };
 
     res.json({ success: true, data: destination });
