@@ -17,6 +17,8 @@ const aiRoutes       = require('./routes/ai.routes');
 const adminRoutes    = require('./routes/admin.routes');
 const reviewRoutes   = require('./routes/reviews.routes');
 const beachesRoutes  = require('./routes/beaches.routes');
+const destinationsRoutes = require('./routes/destinations.routes');
+
 
 const app = express();
 
@@ -93,6 +95,7 @@ app.use('/api/beaches',        beachesRoutes);
 app.use('/api/settings',       require('./routes/settings.routes'));
 app.use('/api/slides',         require('./routes/slides.routes'));
 app.use('/api/ai',             require('./routes/ai-flyer.routes'))
+app.use('/api/destinations',   destinationsRoutes);
 
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // WEBHOOK DE STRIPE
