@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../db'); // tu conexión MySQL
+const db = require('../config/db'); // tu conexión MySQL
 
 // ── GET TODOS LOS DESTINOS ──
 router.get('/', async (req, res) => {
