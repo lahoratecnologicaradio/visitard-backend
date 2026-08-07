@@ -24,7 +24,7 @@ router.get('/', async (req, res) => {
       WHERE active = TRUE 
       ORDER BY name ASC
     `;
-    const [results] = await db.query(query);
+    const [results] = await db.promise().query(query);
     
     const destinations = results.map(d => ({
       ...d,
