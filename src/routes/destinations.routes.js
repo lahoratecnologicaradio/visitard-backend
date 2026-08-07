@@ -3,19 +3,15 @@ const router = express.Router();
 const db = require('../config/db');
 
 // ── GET TODOS LOS DESTINOS ──
-router.get('/', (req, res) => {
-  const query = `
-    SELECT id, name, region, lat, lng, aliases, active 
-    FROM destinations 
-    WHERE active = TRUE 
-    ORDER BY name ASC
-  `;
-  
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error('Error fetching destinations:', err);
-      return res.status(500).json({ success: false, message: 'Error fetching destinations', error: err.message });
-    }
+router.get('/', async (req, res) => {
+  try {
+    const query = `
+      SELECT id, name, region, lat, lng, aliases, active 
+      FROM destinations 
+      WHERE active = TRUE 
+      ORDER BY name ASC
+    `;
+    const [results] = await db.query(query);
     
     // Parse aliases (JSON)
     const destinations = results.map(d => ({
@@ -24,25 +20,24 @@ router.get('/', (req, res) => {
     }));
 
     res.json({ success: true, data: destinations });
-  });
+  } catch (error) {
+    console.error('Error fetching destinations:', error);
+    res.status(500).json({ success: false, message: 'Error fetching destinations', error: error.message });
+  }
 });
 
 // ── BUSCAR DESTINOS POR NOMBRE O ALIAS ──
-router.get('/search/:query', (req, res) => {
-  const searchTerm = `%${req.params.query}%`;
-  const query = `
-    SELECT id, name, region, lat, lng, aliases, active 
-    FROM destinations 
-    WHERE active = TRUE 
-    AND (name LIKE ? OR aliases LIKE ?)
-    ORDER BY name ASC
-  `;
-  
-  db.query(query, [searchTerm, searchTerm], (err, results) => {
-    if (err) {
-      console.error('Error searching destinations:', err);
-      return res.status(500).json({ success: false, message: 'Error searching destinations', error: err.message });
-    }
+router.get('/search/:query', async (req, res) => {
+  try {
+    const searchTerm = `%${req.params.query}%`;
+    const query = `
+      SELECT id, name, region, lat, lng, aliases, active 
+      FROM destinations 
+      WHERE active = TRUE 
+      AND (name LIKE ? OR aliases LIKE ?)
+      ORDER BY name ASC
+    `;
+    const [results] = await db.query(query, [searchTerm, searchTerm]);
     
     const destinations = results.map(d => ({
       ...d,
@@ -50,22 +45,21 @@ router.get('/search/:query', (req, res) => {
     }));
 
     res.json({ success: true, data: destinations });
-  });
+  } catch (error) {
+    console.error('Error searching destinations:', error);
+    res.status(500).json({ success: false, message: 'Error searching destinations', error: error.message });
+  }
 });
 
 // ── GET UN DESTINO POR ID ──
-router.get('/:id', (req, res) => {
-  const query = `
-    SELECT id, name, region, lat, lng, aliases, active 
-    FROM destinations 
-    WHERE id = ?
-  `;
-  
-  db.query(query, [req.params.id], (err, results) => {
-    if (err) {
-      console.error('Error fetching destination:', err);
-      return res.status(500).json({ success: false, message: 'Error fetching destination', error: err.message });
-    }
+router.get('/:id', async (req, res) => {
+  try {
+    const query = `
+      SELECT id, name, region, lat, lng, aliases, active 
+      FROM destinations 
+      WHERE id = ?
+    `;
+    const [results] = await db.query(query, [req.params.id]);
     
     if (results.length === 0) {
       return res.status(404).json({ success: false, message: 'Destination not found' });
@@ -77,95 +71,95 @@ router.get('/:id', (req, res) => {
     };
 
     res.json({ success: true, data: destination });
-  });
+  } catch (error) {
+    console.error('Error fetching destination:', error);
+    res.status(500).json({ success: false, message: 'Error fetching destination', error: error.message });
+  }
 });
 
 // ── CREAR DESTINO (ADMIN) ──
-router.post('/', (req, res) => {
-  const { name, region, lat, lng, aliases } = req.body;
+router.post('/', async (req, res) => {
+  try {
+    const { name, region, lat, lng, aliases } = req.body;
 
-  if (!name || lat === undefined || lng === undefined) {
-    return res.status(400).json({ success: false, message: 'Missing required fields' });
-  }
-
-  const aliasesJson = Array.isArray(aliases) ? JSON.stringify(aliases) : null;
-
-  const query = `
-    INSERT INTO destinations (name, region, lat, lng, aliases, active)
-    VALUES (?, ?, ?, ?, ?, TRUE)
-  `;
-  
-  db.query(query, [name, region, lat, lng, aliasesJson], (err, result) => {
-    if (err) {
-      console.error('Error creating destination:', err);
-      if (err.code === 'ER_DUP_ENTRY') {
-        return res.status(409).json({ success: false, message: 'Destination name already exists' });
-      }
-      return res.status(500).json({ success: false, message: 'Error creating destination', error: err.message });
+    if (!name || lat === undefined || lng === undefined) {
+      return res.status(400).json({ success: false, message: 'Missing required fields' });
     }
+
+    const aliasesJson = Array.isArray(aliases) ? JSON.stringify(aliases) : null;
+
+    const query = `
+      INSERT INTO destinations (name, region, lat, lng, aliases, active)
+      VALUES (?, ?, ?, ?, ?, TRUE)
+    `;
+    const [result] = await db.query(query, [name, region, lat, lng, aliasesJson]);
 
     res.json({
       success: true,
       message: 'Destination created successfully',
       id: result.insertId
     });
-  });
+  } catch (error) {
+    console.error('Error creating destination:', error);
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ success: false, message: 'Destination name already exists' });
+    }
+    res.status(500).json({ success: false, message: 'Error creating destination', error: error.message });
+  }
 });
 
 // ── ACTUALIZAR DESTINO (ADMIN) ──
-router.patch('/:id', (req, res) => {
-  const { name, region, lat, lng, aliases, active } = req.body;
-  const aliasesJson = Array.isArray(aliases) ? JSON.stringify(aliases) : null;
+router.patch('/:id', async (req, res) => {
+  try {
+    const { name, region, lat, lng, aliases, active } = req.body;
+    const aliasesJson = Array.isArray(aliases) ? JSON.stringify(aliases) : null;
 
-  const query = `
-    UPDATE destinations 
-    SET name = COALESCE(?, name),
-        region = COALESCE(?, region),
-        lat = COALESCE(?, lat),
-        lng = COALESCE(?, lng),
-        aliases = COALESCE(?, aliases),
-        active = COALESCE(?, active)
-    WHERE id = ?
-  `;
-  
-  db.query(query, [
-    name || null,
-    region || null,
-    lat !== undefined ? lat : null,
-    lng !== undefined ? lng : null,
-    aliasesJson,
-    active !== undefined ? active : null,
-    req.params.id
-  ], (err, result) => {
-    if (err) {
-      console.error('Error updating destination:', err);
-      return res.status(500).json({ success: false, message: 'Error updating destination', error: err.message });
-    }
+    const query = `
+      UPDATE destinations 
+      SET name = COALESCE(?, name),
+          region = COALESCE(?, region),
+          lat = COALESCE(?, lat),
+          lng = COALESCE(?, lng),
+          aliases = COALESCE(?, aliases),
+          active = COALESCE(?, active)
+      WHERE id = ?
+    `;
+    const [result] = await db.query(query, [
+      name || null,
+      region || null,
+      lat !== undefined ? lat : null,
+      lng !== undefined ? lng : null,
+      aliasesJson,
+      active !== undefined ? active : null,
+      req.params.id
+    ]);
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ success: false, message: 'Destination not found' });
     }
 
     res.json({ success: true, message: 'Destination updated successfully' });
-  });
+  } catch (error) {
+    console.error('Error updating destination:', error);
+    res.status(500).json({ success: false, message: 'Error updating destination', error: error.message });
+  }
 });
 
 // ── ELIMINAR DESTINO (ADMIN) ──
-router.delete('/:id', (req, res) => {
-  const query = 'UPDATE destinations SET active = FALSE WHERE id = ?';
-  
-  db.query(query, [req.params.id], (err, result) => {
-    if (err) {
-      console.error('Error deleting destination:', err);
-      return res.status(500).json({ success: false, message: 'Error deleting destination', error: err.message });
-    }
+router.delete('/:id', async (req, res) => {
+  try {
+    const query = 'UPDATE destinations SET active = FALSE WHERE id = ?';
+    const [result] = await db.query(query, [req.params.id]);
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ success: false, message: 'Destination not found' });
     }
 
     res.json({ success: true, message: 'Destination deleted successfully' });
-  });
+  } catch (error) {
+    console.error('Error deleting destination:', error);
+    res.status(500).json({ success: false, message: 'Error deleting destination', error: error.message });
+  }
 });
 
 module.exports = router;
